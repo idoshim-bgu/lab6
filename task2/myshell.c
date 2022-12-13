@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include "LineParser.h"
 
+
 #define TERMINATED  -1
 #define RUNNING 1
 #define SUSPENDED 0
@@ -87,14 +88,19 @@ void updateProcessList(process **process_list){
     {
         int status;
         pid_t retPid =  waitpid(curr->pid,&status, WNOHANG | WUNTRACED | WCONTINUED);
-            if (retPid == -1 || WIFSIGNALED(status))
-                curr->status = TERMINATED;
-            else if (WIFCONTINUED(status))
-                curr->status = RUNNING;
-            else if (WIFSTOPPED(status))
-                curr->status = SUSPENDED;
+        if ( retPid == -1 ||WIFSIGNALED(status) || WIFEXITED(status))
+            curr->status = TERMINATED;
+        else if (WIFSTOPPED(status))
+            curr->status = SUSPENDED;
+        else 
+            curr->status = RUNNING;
+            
         curr = curr->next;
     }
+}
+void deleteProcess(process* proc){
+    freeCmdLines(proc->cmd);
+    free(proc);
 }
 
 void printProcess(process* proc){
@@ -102,7 +108,6 @@ void printProcess(process* proc){
 }
 
 void printProcessList(process** process_list){
-    updateProcessList(process_list);
     process *prev = NULL;
     process *curr = *process_list;
     while (curr != NULL)
@@ -115,8 +120,9 @@ void printProcessList(process** process_list){
                 prev->next = curr->next;
             }else
                 *process_list = curr->next;
+            deleteProcess(curr);
        }else
-        prev = curr;
+            prev = curr;
        
        curr = curr->next;
     }
@@ -128,13 +134,15 @@ void execute(cmdLine *pCmdLine){
     int status;
     
     command = pCmdLine->arguments[0];
-    args = &(pCmdLine->arguments[1]);
+    args = pCmdLine->arguments;
     if (!strcmp("cd", command)){
-        if (chdir(args[0]) == -1)
-            fprintf(stderr, "failed to cd into %s", args[0]);
+        if (chdir(args[1]) == -1)
+            fprintf(stderr, "failed to cd into %s", args[1]);
+        freeCmdLines(pCmdLine);
     } else if (!strcmp("procs", command)){
         updateProcessList(&processList);
         printProcessList(&processList);
+        freeCmdLines(pCmdLine);
     }
     else{
         int pid = fork();
