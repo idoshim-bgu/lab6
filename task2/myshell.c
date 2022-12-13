@@ -88,11 +88,11 @@ void updateProcessList(process **process_list){
     {
         int status;
         pid_t retPid =  waitpid(curr->pid,&status, WNOHANG | WUNTRACED | WCONTINUED);
-        if ( retPid == -1 ||WIFSIGNALED(status) || WIFEXITED(status))
+        if ( retPid == -1)
             curr->status = TERMINATED;
         else if (WIFSTOPPED(status))
             curr->status = SUSPENDED;
-        else 
+        else if(WIFCONTINUED(status))
             curr->status = RUNNING;
             
         curr = curr->next;
@@ -142,6 +142,23 @@ void execute(cmdLine *pCmdLine){
     } else if (!strcmp("procs", command)){
         updateProcessList(&processList);
         printProcessList(&processList);
+        freeCmdLines(pCmdLine);
+    } else if (!strcmp("kill", command)){
+        pid_t  pid =  atoi(args[1]);
+        kill(pid, SIGINT);
+        updateProcessStatus(processList, pid, TERMINATED);
+        freeCmdLines(pCmdLine);
+    }
+    else if (!strcmp("suspend", command)){
+        pid_t  pid =  atoi(args[1]);
+        kill(pid, SIGTSTP);
+        updateProcessStatus(processList, pid, SUSPENDED);
+        freeCmdLines(pCmdLine);
+    }
+    else if (!strcmp("wake", command)){
+        pid_t  pid =  atoi(args[1]);
+        kill(pid, SIGCONT);
+        updateProcessStatus(processList, pid, RUNNING);
         freeCmdLines(pCmdLine);
     }
     else{
